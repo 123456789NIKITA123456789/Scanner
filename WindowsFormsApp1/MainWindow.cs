@@ -314,7 +314,7 @@ namespace WindowsFormsApp1
                 newId = Regex.Replace(newId, @"[^0-9a-zA-Z]+", "");
                 if (id == newId)
                 {
-                    string infoError = "Код не принадлежит выбранному подразделению";
+                    string infoError = "Код не принадлежит выбранному адресу";
                     int[] rgbaError = { 220, 20, 60, 125 };
                     SetInfoBox(infoError, rgbaError);
                     Block();
@@ -726,9 +726,9 @@ namespace WindowsFormsApp1
 
                 DialogResult dialogResult = MessageBox.
                             Show("Вы действительно хотите удалить адрес  " + address.getName() + " ?",
-                            "Удаление адреса из базы данных", MessageBoxButtons.YesNo);
+                            "Удаление адреса", MessageBoxButtons.OKCancel);
 
-                if (dialogResult == DialogResult.Yes)
+                if (dialogResult == DialogResult.OK)
                 {
                     Program.dBworker.DeleteAddress(cityId, addressId);
 
@@ -741,9 +741,10 @@ namespace WindowsFormsApp1
                     Program.dBworker.setCurAddressID("-1");
                     Program.dBworker.setCurCityId("-1");
                     InfoLabel(Program.dBworker.getCurCity());
+                    divisionsChecked.Items.Clear();
                     textBox1.Focus();
                 }
-                else if (dialogResult == DialogResult.No)
+                else if (dialogResult == DialogResult.Cancel)
                 {
                     textBox1.Focus();
                     return;
