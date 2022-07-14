@@ -24,7 +24,7 @@ namespace WindowsFormsApp1
             InitializeComponent();
         }
 
-        private void CodeWindow_Load(object sender, EventArgs e)
+        private void InfoWindow_Load(object sender, EventArgs e)
         {
             Program.dBworker.Attach(this);
         }

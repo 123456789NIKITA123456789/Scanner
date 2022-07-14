@@ -116,6 +116,29 @@ namespace WindowsFormsApp1
 
             return currentCity;
         }
+        private void InfoLabel(City city)
+        {
+            int addressIndex = Program.dBworker.getCurAddressIndex();
+            if ((city != null) && (city.getAddresses().Count != 0) && (addressIndex != -1))
+            {
+                if ((city.getName() != null) && (city.getAddresses()[addressIndex].getName() != null))
+                {
+                    Program.ToMain(labelCity, (labelCity) =>
+                    {
+                        string curCity = city.getName();
+                        string curAddress = city.getAddresses()[addressIndex].getName();
+                        labelCity.Text = $"Город выбранного подразделения: {curCity}, адрес: {curAddress}";
+                        return true;
+                    });
+                }
+            }
+            else
+            {
+                labelCity.Text = "";
+            }
+
+        }
+
         public void StartAuthenticationWindow()
         {
             AuthenticationWindow aw = new AuthenticationWindow();
@@ -272,6 +295,35 @@ namespace WindowsFormsApp1
             }
         }
 
+        private void MainWindow_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            ClosingVideo_MainWindow(e);
+        }
+
+        private async void ClosingVideo_MainWindow(FormClosingEventArgs e)
+        {
+            if (videoSource != null)
+            {
+                if (invokeInProgress)
+                {
+                    e.Cancel = true;  // cancel the original event 
+
+                    stopInvoking = true; // advise to stop taking new work
+
+                    // now wait until current invoke finishes
+                    await Task.Factory.StartNew(() =>
+                    {
+                        while (invokeInProgress) ;
+                    });
+                    videoSource.SignalToStop();
+                    videoSource.WaitForStop();
+                    // now close the form
+                    this.Close();
+                }
+
+            }
+        }
+
         private void CheckScannedItem(string id)
         {
             OutputInfo(id);
@@ -321,13 +373,38 @@ namespace WindowsFormsApp1
                 }
                 else
                 {
-                    string infoException = "Переключите раскладку клавиатуры на английский язык для продолжения работы со сканером";
+                    string infoException = "Переключите раскладку клавиатуры на английский язык " +
+                        "для продолжения работы со сканером";
                     int[] rgbaException= { 255, 165, 0, 125 };
                     SetInfoBox(infoException, rgbaException);
                     Block();
                 }
                 
             }
+        }
+
+        private void SetInfoBox(string info, int[] rgba)
+        {
+            Program.ToMain(infoBox, (infoBox) =>
+            {
+                ((Label)infoBox).Text = info;
+                Color color = Color.FromArgb(rgba[3], rgba[0], rgba[1], rgba[2]);
+                infoBox.BackColor = color;
+                return true;
+            });
+        }
+
+        private void SetInfoBoxEmpty()
+        {
+            Thread.Sleep(2000);
+            Program.ToMain(infoBox, (infoBox) =>
+            {
+                ((Label)infoBox).Text = String.Empty;
+                Color color = Color.FromArgb(0, 0, 0, 0);
+                infoBox.BackColor = color;
+                return true;
+            });
+            permissionInfoScan=true;
         }
 
         private void Block()
@@ -344,57 +421,21 @@ namespace WindowsFormsApp1
             clear.Start();
         }
 
-        private void SetInfoBoxEmpty()
+        public void SetCheckState(int itemIndex, bool check)
         {
-            Thread.Sleep(2000);
-            Program.ToMain(infoBox, (infoBox) =>
+            CheckState newState;
+            if (check)
             {
-                ((Label)infoBox).Text = String.Empty;
-                Color color = Color.FromArgb(0, 0, 0, 0);
-                infoBox.BackColor = color;
-                return true;
-            });
-            permissionInfoScan=true;
-        }
-
-        private void SetInfoBox(string info, int[] rgba)
-        {
-            Program.ToMain(infoBox, (infoBox) =>
-            {
-                ((Label)infoBox).Text = info;
-                Color color = Color.FromArgb(rgba[3], rgba[0], rgba[1], rgba[2]);
-                infoBox.BackColor = color;
-                return true;
-            });
-        }
-
-        private void MainWindow_FormClosing(object sender, FormClosingEventArgs e)
-        {
-            ClosingVideo_MainWindow(e);
-        }
-
-        private async void ClosingVideo_MainWindow(FormClosingEventArgs e)
-        {
-            if (videoSource != null)
-            {
-                if (invokeInProgress)
-                {
-                    e.Cancel = true;  // cancel the original event 
-
-                    stopInvoking = true; // advise to stop taking new work
-
-                    // now wait until current invoke finishes
-                    await Task.Factory.StartNew(() =>
-                    {
-                        while (invokeInProgress) ;
-                    });
-                    videoSource.SignalToStop();
-                    videoSource.WaitForStop();
-                    // now close the form
-                    this.Close();
-                }
-
+                newState = CheckState.Checked;
             }
+            else
+            {
+                newState = CheckState.Unchecked;
+            }
+
+            divisionsChecked.ItemCheck -= divisionsChecked_ItemCheck; // отключаем обработчик
+            divisionsChecked.SetItemCheckState(itemIndex, newState); // меняем состояние
+            divisionsChecked.ItemCheck += divisionsChecked_ItemCheck; // подключаем обработчик
         }
 
         private void divisionsChecked_SelectedIndexChanged(object sender, EventArgs e)
@@ -411,6 +452,125 @@ namespace WindowsFormsApp1
                 chdata.ShowDialog();
             }
             textBox1.Focus();
+        }
+
+        private void divisionsChecked_ItemCheck(object sender, ItemCheckEventArgs e)
+        {
+            e.NewValue = e.CurrentValue;
+            textBox1.Focus();
+        }
+
+        private void newSessionButton_Click(object sender, EventArgs e)
+        {
+            StartNewSession();
+        }
+
+        private void StartNewSession()
+        {
+            for (int i = 0; i < allDiv.Count; i++)
+            {
+                Program.dBworker.UpdateDivisionCheck(allDiv[i].getId(), false);
+            }
+            textBox1.Focus();
+        }
+
+        private void departmentButton_Click(object sender, EventArgs e)
+        {
+            SelectDepartment();
+        }
+
+        private async void SelectDepartment()
+        {
+            this.Enabled = false;
+            Program.dBworker.UnsubscribeListener_Divisions();
+
+            StartAuthenticationWindow();
+
+            bool result = await Program.dBworker.GetAddressesFromDB();
+            Program.dBworker.StartListenerFromDB_Divisions();
+            Program.dBworker.NotifyWin();
+            this.Enabled = true;
+
+            newDivisionButton.Enabled = true;
+            divisionDeleteButton.Enabled = true;
+            infoDivisionButton.Enabled = true;
+            newSessionButton.Enabled = true;
+            deleteAddressButton.Enabled = true;
+
+            currentCity = Program.dBworker.getCurCity();
+            InfoLabel(currentCity);
+            textBox1.Focus();
+        }
+
+        private void MainWindow_KeyPress(object sender, KeyPressEventArgs e)
+        {
+            TimeSpan elapsed = (DateTime.Now - _lastKeystroke);
+            if (elapsed.TotalMilliseconds > 100)
+                _barcode.Clear();     
+            
+            if (e.KeyChar == 13 && _barcode.Count > 0)
+            {
+                string code = new String(_barcode.ToArray());
+                CheckScannedItem(code);
+                _barcode.Clear();
+            }
+            else
+            {
+                _barcode.Add((char) e.KeyChar);
+                
+                _lastKeystroke = DateTime.Now;
+            }
+            textBox1.Clear();
+        }
+
+        private void deleteAddressButton_Click(object sender, EventArgs e)
+        {
+            DeleteAddressButton();
+        }
+
+        private void DeleteAddressButton()
+        {
+            City city = Program.dBworker.getCurCity();
+            Address address = Program.dBworker.getCurAddress();
+            if ((city != null)&&(address != null))
+            {
+                string cityId = city.getId();
+                string addressId = address.getId();
+
+                DialogResult dialogResult = MessageBox.
+                            Show("Вы действительно хотите удалить адрес  " + address.getName() + " ?",
+                            "Удаление адреса", MessageBoxButtons.OKCancel);
+
+                if (dialogResult == DialogResult.OK)
+                {
+                    Program.dBworker.DeleteAddress(cityId, addressId);
+
+                    newDivisionButton.Enabled = false;
+                    divisionDeleteButton.Enabled = false;
+                    infoDivisionButton.Enabled=false;
+                    newSessionButton.Enabled=false;
+                    deleteAddressButton.Enabled=false;
+
+                    Program.dBworker.setCurAddressID("-1");
+                    Program.dBworker.setCurCityId("-1");
+                    InfoLabel(Program.dBworker.getCurCity());
+                    divisionsChecked.Items.Clear();
+                    textBox1.Focus();
+                }
+                else if (dialogResult == DialogResult.Cancel)
+                {
+                    textBox1.Focus();
+                    return;
+                }
+            }
+        }
+        private void MainWindow_FormClosed(object sender, FormClosedEventArgs e)
+        {
+            Program.dBworker.Detach(this);
+            if (Program.dBworker.ListenerFromDB_CitiesExist())
+                Program.dBworker.UnsubscribeListener_Cities();
+            if (Program.dBworker.ListenerFromDB_AddressesExist())
+                Program.dBworker.UnsubscribeListener_Addresses();
         }
 
         private void InitializeComponent()
@@ -577,179 +737,6 @@ namespace WindowsFormsApp1
             this.ResumeLayout(false);
             this.PerformLayout();
 
-        }
-
-        private void divisionsChecked_MeasureItem(object sender, MeasureItemEventArgs e)
-        {
-            e.ItemHeight = (int)e.Graphics.MeasureString(divisionsChecked.Items[e.Index].ToString(), 
-                                                        divisionsChecked.Font, divisionsChecked.Width).Height;
-        }
-
-        private void divisionsChecked_DrawItem(object sender, DrawItemEventArgs e)
-        {
-            if (divisionsChecked.Items.Count > 0)
-            {
-                e.DrawBackground();
-                e.DrawFocusRectangle();
-                e.Graphics.DrawString(divisionsChecked.Items[e.Index].ToString(), e.Font, new SolidBrush(e.ForeColor), e.Bounds);
-            }
-        }
-        public void SetCheckState(int itemIndex, bool check)
-        {
-            CheckState newState;
-            if (check)
-            {
-                newState = CheckState.Checked;
-            }
-            else
-            {
-                newState = CheckState.Unchecked;
-            }
-
-            divisionsChecked.ItemCheck -= divisionsChecked_ItemCheck; // отключаем обработчик
-            divisionsChecked.SetItemCheckState(itemIndex, newState); // меняем состояние
-            divisionsChecked.ItemCheck += divisionsChecked_ItemCheck; // подключаем обработчик
-        }
-        private void divisionsChecked_ItemCheck(object sender, ItemCheckEventArgs e)
-        {
-            e.NewValue = e.CurrentValue;
-            textBox1.Focus();
-        }
-
-        private void newSessionButton_Click(object sender, EventArgs e)
-        {
-            StartNewSession();
-        }
-
-        private void StartNewSession()
-        {
-            for (int i = 0; i < allDiv.Count; i++)
-            {
-                Program.dBworker.UpdateDivisionCheck(allDiv[i].getId(), false);
-            }
-            textBox1.Focus();
-        }
-
-        private void departmentButton_Click(object sender, EventArgs e)
-        {
-            SelectDepartment();
-        }
-
-        private async void SelectDepartment()
-        {
-            this.Enabled = false;
-            Program.dBworker.UnsubscribeListener_Divisions();
-
-            StartAuthenticationWindow();
-
-            bool result = await Program.dBworker.GetAddressesFromDB();
-            Program.dBworker.StartListenerFromDB_Divisions();
-            Program.dBworker.NotifyWin();
-            this.Enabled = true;
-
-            newDivisionButton.Enabled = true;
-            divisionDeleteButton.Enabled = true;
-            infoDivisionButton.Enabled = true;
-            newSessionButton.Enabled = true;
-            deleteAddressButton.Enabled = true;
-
-            currentCity = Program.dBworker.getCurCity();
-            InfoLabel(currentCity);
-            textBox1.Focus();
-        }
-
-        private void InfoLabel(City city)
-        {
-            int addressIndex = Program.dBworker.getCurAddressIndex();
-            if ((city != null)&&(city.getAddresses().Count != 0)&&(addressIndex != -1))
-            {
-                if ((city.getName() != null) && (city.getAddresses()[addressIndex].getName() != null))
-                {
-                    Program.ToMain(labelCity, (labelCity) =>
-                    {
-                        string curCity = city.getName();
-                        string curAddress = city.getAddresses()[addressIndex].getName();
-                        labelCity.Text = $"Город выбранного подразделения: {curCity}, адрес: {curAddress}";
-                        return true;
-                    });
-                }
-            }
-            else
-            {
-                labelCity.Text = "";
-            }
-            
-        }
-        private void MainWindow_FormClosed(object sender, FormClosedEventArgs e)
-        {
-            Program.dBworker.Detach(this);
-            if (Program.dBworker.ListenerFromDB_CitiesExist())
-                Program.dBworker.UnsubscribeListener_Cities();
-            if (Program.dBworker.ListenerFromDB_AddressesExist())
-                Program.dBworker.UnsubscribeListener_Addresses();
-        }
-
-        private void MainWindow_KeyPress(object sender, KeyPressEventArgs e)
-        {
-            TimeSpan elapsed = (DateTime.Now - _lastKeystroke);
-            if (elapsed.TotalMilliseconds > 100)
-                _barcode.Clear();     
-            
-            if (e.KeyChar == 13 && _barcode.Count > 0)
-            {
-                string code = new String(_barcode.ToArray());
-                CheckScannedItem(code);
-                _barcode.Clear();
-            }
-            else
-            {
-                _barcode.Add((char) e.KeyChar);
-                
-                _lastKeystroke = DateTime.Now;
-            }
-            textBox1.Clear();
-        }
-
-        private void deleteAddressButton_Click(object sender, EventArgs e)
-        {
-            DeleteAddressButton();
-        }
-
-        private void DeleteAddressButton()
-        {
-            City city = Program.dBworker.getCurCity();
-            Address address = Program.dBworker.getCurAddress();
-            if ((city != null)&&(address != null))
-            {
-                string cityId = city.getId();
-                string addressId = address.getId();
-
-                DialogResult dialogResult = MessageBox.
-                            Show("Вы действительно хотите удалить адрес  " + address.getName() + " ?",
-                            "Удаление адреса", MessageBoxButtons.OKCancel);
-
-                if (dialogResult == DialogResult.OK)
-                {
-                    Program.dBworker.DeleteAddress(cityId, addressId);
-
-                    newDivisionButton.Enabled = false;
-                    divisionDeleteButton.Enabled = false;
-                    infoDivisionButton.Enabled=false;
-                    newSessionButton.Enabled=false;
-                    deleteAddressButton.Enabled=false;
-
-                    Program.dBworker.setCurAddressID("-1");
-                    Program.dBworker.setCurCityId("-1");
-                    InfoLabel(Program.dBworker.getCurCity());
-                    divisionsChecked.Items.Clear();
-                    textBox1.Focus();
-                }
-                else if (dialogResult == DialogResult.Cancel)
-                {
-                    textBox1.Focus();
-                    return;
-                }
-            }
         }
     }
 }

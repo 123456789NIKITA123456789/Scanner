@@ -116,6 +116,10 @@ namespace WindowsFormsApp1
             }
         }
 
+        private void cityBox_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            LoadAddresses();
+        }
         private void LoadAddresses()
         {
             addressBox.Items.Clear();
@@ -125,33 +129,9 @@ namespace WindowsFormsApp1
             //Program.dBworker.GetAddressesFromDB();
         }
 
-        private void LoadDataAndClose()
+        private void addAddressButton_Click(object sender, EventArgs e)
         {
-            if(addressBox.SelectedIndex != -1)
-            {
-                int curAddressIndex = addressBox.SelectedIndex;
-                Program.dBworker.setCurAddressIndex(curAddressIndex);
-
-                FileStream fs = File.Create(Path.Combine(Path.GetTempPath(), "depart.txt"));
-                fs.Close();
-                StreamWriter sw = new StreamWriter(Path.Combine(Path.GetTempPath(), "depart.txt"));
-                sw.WriteLine(Program.dBworker.getCurCity().getId());
-                sw.WriteLine(Program.dBworker.getCurAddress().getId());
-                sw.Close();
-
-                loadSucces = true;
-                this.Close();
-            }
-            else
-            {
-                MessageBox.Show("Выберите адрес подразделения");
-            }
-            
-        }
-
-        private void cityBox_SelectedIndexChanged(object sender, EventArgs e)
-        {
-            LoadAddresses();
+            AddNewAddress();
         }
 
         private void AddNewAddress()
@@ -168,16 +148,6 @@ namespace WindowsFormsApp1
             addressBox.Items.Clear();
             if (Program.dBworker.getCurCityIndex() > 0)
                 cityBox.SelectedIndex = Program.dBworker.getCurCityIndex();
-        }
-
-        private void addAddressButton_Click(object sender, EventArgs e)
-        {
-            AddNewAddress();
-        }
-
-        private void outputInfoButton_Click(object sender, EventArgs e)
-        {
-            LoadDataAndClose();
         }
 
         public void setCurrentCity(City currentCity)
@@ -199,6 +169,34 @@ namespace WindowsFormsApp1
 
                 indexOldAddress = Program.dBworker.getCurAddressIndex();
             }
+        }
+
+        private void outputInfoButton_Click(object sender, EventArgs e)
+        {
+            LoadDataAndClose();
+        }
+        private void LoadDataAndClose()
+        {
+            if (addressBox.SelectedIndex != -1)
+            {
+                int curAddressIndex = addressBox.SelectedIndex;
+                Program.dBworker.setCurAddressIndex(curAddressIndex);
+
+                FileStream fs = File.Create(Path.Combine(Path.GetTempPath(), "depart.txt"));
+                fs.Close();
+                StreamWriter sw = new StreamWriter(Path.Combine(Path.GetTempPath(), "depart.txt"));
+                sw.WriteLine(Program.dBworker.getCurCity().getId());
+                sw.WriteLine(Program.dBworker.getCurAddress().getId());
+                sw.Close();
+
+                loadSucces = true;
+                this.Close();
+            }
+            else
+            {
+                MessageBox.Show("Выберите адрес подразделения");
+            }
+
         }
         private void AuthenticationWindow_FormClosing(object sender, FormClosingEventArgs e)
         {

@@ -56,15 +56,17 @@ namespace WindowsFormsApp1
             authentication.UpdateCities(cities);
         }
 
+        public void Detach(Window window)
+        {
+            this.windows.Remove(window);
+        }
+
         public void Detach(Authentication authentication)
         {
             this.authentications.Remove(authentication);
 
         }
-        public void Detach(Window window)
-        {
-            this.windows.Remove(window);
-        }
+        
         public void NotifyWin()
         {
             foreach (Window window in this.windows)
@@ -413,14 +415,6 @@ namespace WindowsFormsApp1
             }
         }
         
-        public void StartNewSeccion(List<string> id)
-        {
-            for (int i = 0; i < id.Count; i++)
-            {
-                UpdateDivisionCheck(id[i], false);
-            }
-        }
-
         public async Task<bool> GetCitiesFromDB()
         {
             QuerySnapshot snap = null;
@@ -431,6 +425,7 @@ namespace WindowsFormsApp1
             }
             catch
             {
+                //attempts to handle startup when there is no internet
                 MessageBox.Show("Проверте подключение к интернету и перезапустите приложение");
                 Application.Exit();
                 //Thread.Sleep(5000);

@@ -240,7 +240,7 @@
             this.Name = "InfoWindow";
             this.Text = "Инфомарция по подразделениям";
             this.FormClosed += new System.Windows.Forms.FormClosedEventHandler(this.CodeWindow_FormClosed);
-            this.Load += new System.EventHandler(this.CodeWindow_Load);
+            this.Load += new System.EventHandler(this.InfoWindow_Load);
             ((System.ComponentModel.ISupportInitialize)(this.codeOutputBox)).EndInit();
             this.ResumeLayout(false);
             this.PerformLayout();
